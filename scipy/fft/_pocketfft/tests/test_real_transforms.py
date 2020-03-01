@@ -16,6 +16,16 @@ fftpack_test_dir = join(dirname(__file__), '..', '..', '..', 'fftpack', 'tests')
 MDATA_COUNT = 8
 FFTWDATA_COUNT = 14
 
+def is_longdouble_binary_compatible():
+    try:
+        one = np.frombuffer(
+            b'\x00\x00\x00\x00\x00\x00\x00\x80\xff\x3f\x00\x00\x00\x00\x00\x00',
+            dtype='<f16')
+        return one == np.longfloat(1.)
+    except TypeError:
+        return False
+
+
 def get_reference_data():
     ref = getattr(globals(), '__reference_data', None)
     if ref is not None:
@@ -36,7 +46,7 @@ def get_reference_data():
     FFTWDATA_SIZES = FFTWDATA_DOUBLE['sizes']
     assert len(FFTWDATA_SIZES) == FFTWDATA_COUNT
 
-    if np.longfloat().itemsize == 16:
+    if is_longdouble_binary_compatible():
         FFTWDATA_LONGDOUBLE = np.load(
             join(fftpack_test_dir, 'fftw_longdouble_ref.npz'))
     else:
@@ -104,7 +114,7 @@ def fftw_dst_ref(type, size, dt):
 
 
 def ref_2d(func, x, **kwargs):
-    """Calculate 2d reference data from a 1d transform"""
+    """Calculate 2-D reference data from a 1d transform"""
     x = np.array(x, copy=True)
     for row in range(x.shape[0]):
         x[row, :] = func(x[row, :], **kwargs)
@@ -135,7 +145,7 @@ def naive_dct1(x, norm=None):
 
 
 def naive_dst1(x, norm=None):
-    """Calculate textbook definition version  of DST-I."""
+    """Calculate textbook definition version of DST-I."""
     x = np.array(x, copy=True)
     N = len(x)
     M = N+1
@@ -149,7 +159,7 @@ def naive_dst1(x, norm=None):
 
 
 def naive_dct4(x, norm=None):
-    """Calculate textbook definition version  of DCT-IV."""
+    """Calculate textbook definition version of DCT-IV."""
     x = np.array(x, copy=True)
     N = len(x)
     y = np.zeros(N)
@@ -164,7 +174,7 @@ def naive_dct4(x, norm=None):
 
 
 def naive_dst4(x, norm=None):
-    """Calculate textbook definition version  of DST-IV."""
+    """Calculate textbook definition version of DST-IV."""
     x = np.array(x, copy=True)
     N = len(x)
     y = np.zeros(N)
@@ -468,3 +478,12 @@ class Test_DCTN_IDCTN(object):
         tmp = fforward(self.data, s=None, axes=axes, norm='ortho')
         tmp = finverse(tmp, s=None, axes=axes, norm='ortho')
         assert_array_almost_equal(self.data, tmp, decimal=self.dec)
+
+
+@pytest.mark.parametrize('func', [dct, dctn, idct, idctn,
+                                  dst, dstn, idst, idstn])
+def test_swapped_byte_order(func):
+    rng = np.random.RandomState(1234)
+    x = rng.rand(10)
+    swapped_dt = x.dtype.newbyteorder('S')
+    assert_allclose(func(x.astype(swapped_dt)), func(x))

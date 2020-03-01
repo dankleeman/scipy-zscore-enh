@@ -36,10 +36,10 @@ import sys
 import numpy
 from numpy import fft
 from numpy.testing import (assert_, assert_equal, assert_array_equal,
-                           assert_array_almost_equal, assert_almost_equal)
+                           assert_array_almost_equal, assert_almost_equal,
+                           suppress_warnings)
 import pytest
 from pytest import raises as assert_raises
-from scipy._lib._numpy_compat import suppress_warnings
 import scipy.ndimage as ndimage
 
 
@@ -316,6 +316,14 @@ class TestNdimage:
                                       mode='nearest', origin=-1)
             assert_array_almost_equal([[2, 3, 5], [5, 6, 8]], output)
             assert_equal(output.dtype.type, numpy.float32)
+
+    def test_correlate_mode_sequence(self):
+        kernel = numpy.ones((2, 2))
+        array = numpy.ones((3, 3), float)
+        with assert_raises(RuntimeError):
+            ndimage.correlate(array, kernel, mode=['nearest', 'reflect'])
+        with assert_raises(RuntimeError):
+            ndimage.convolve(array, kernel, mode=['nearest', 'reflect'])
 
     def test_correlate19(self):
         kernel = numpy.array([[1, 0],
@@ -746,6 +754,10 @@ class TestNdimage:
         assert_array_almost_equal([[2, 2, 1, 1, 1],
                                    [2, 2, 1, 1, 1],
                                    [5, 3, 3, 1, 1]], output)
+        # separable footprint should allow mode sequence
+        output2 = ndimage.minimum_filter(array, footprint=footprint,
+                                         mode=['reflect', 'reflect'])
+        assert_array_almost_equal(output2, output)
 
     def test_minimum_filter07(self):
         array = numpy.array([[3, 2, 5, 1, 4],
@@ -756,6 +768,9 @@ class TestNdimage:
         assert_array_almost_equal([[2, 2, 1, 1, 1],
                                    [2, 3, 1, 3, 1],
                                    [5, 5, 3, 3, 1]], output)
+        with assert_raises(RuntimeError):
+            ndimage.minimum_filter(array, footprint=footprint,
+                                   mode=['reflect', 'constant'])
 
     def test_minimum_filter08(self):
         array = numpy.array([[3, 2, 5, 1, 4],
@@ -821,6 +836,10 @@ class TestNdimage:
         assert_array_almost_equal([[3, 5, 5, 5, 4],
                                    [7, 9, 9, 9, 5],
                                    [8, 9, 9, 9, 7]], output)
+        # separable footprint should allow mode sequence
+        output2 = ndimage.maximum_filter(array, footprint=footprint,
+                                         mode=['reflect', 'reflect'])
+        assert_array_almost_equal(output2, output)
 
     def test_maximum_filter07(self):
         array = numpy.array([[3, 2, 5, 1, 4],
@@ -831,6 +850,10 @@ class TestNdimage:
         assert_array_almost_equal([[3, 5, 5, 5, 4],
                                    [7, 7, 9, 9, 5],
                                    [7, 9, 8, 9, 7]], output)
+        # non-separable footprint should not allow mode sequence
+        with assert_raises(RuntimeError):
+            ndimage.maximum_filter(array, footprint=footprint,
+                                   mode=['reflect', 'reflect'])
 
     def test_maximum_filter08(self):
         array = numpy.array([[3, 2, 5, 1, 4],
@@ -929,6 +952,15 @@ class TestNdimage:
         assert_array_almost_equal(expected, output)
         output = ndimage.median_filter(array, size=(2, 3))
         assert_array_almost_equal(expected, output)
+
+        # non-separable: does not allow mode sequence
+        with assert_raises(RuntimeError):
+            ndimage.percentile_filter(array, 50.0, size=(2, 3),
+                                      mode=['reflect', 'constant'])
+        with assert_raises(RuntimeError):
+            ndimage.rank_filter(array, 3, size=(2, 3), mode=['reflect']*2)
+        with assert_raises(RuntimeError):
+            ndimage.median_filter(array, size=(2, 3), mode=['reflect']*2)
 
     def test_rank09(self):
         expected = [[3, 3, 2, 4, 4],
@@ -1066,6 +1098,13 @@ class TestNdimage:
                 a, _filter_func, footprint=footprint, extra_arguments=(cf,),
                 extra_keywords={'total': cf.sum()})
             assert_array_almost_equal(r1, r2)
+
+        # generic_filter doesn't allow mode sequence
+        with assert_raises(RuntimeError):
+            r2 = ndimage.generic_filter(
+                a, _filter_func, mode=['reflect', 'reflect'],
+                footprint=footprint, extra_arguments=(cf,),
+                extra_keywords={'total': cf.sum()})
 
     def test_extend01(self):
         array = numpy.array([1, 2, 3])
@@ -1938,7 +1977,7 @@ class TestNdimage:
         for order in range(0, 6):
             with suppress_warnings() as sup:
                 sup.filter(UserWarning,
-                           "The behaviour of affine_transform with a one-dimensional array .* has changed")
+                           "The behavior of affine_transform with a 1-D array .* has changed")
                 out1 = ndimage.affine_transform(data, [2], -1, order=order)
             out2 = ndimage.affine_transform(data, [[2]], -1, order=order)
             assert_array_almost_equal(out1, out2)
@@ -1949,7 +1988,7 @@ class TestNdimage:
         for order in range(0, 6):
             with suppress_warnings() as sup:
                 sup.filter(UserWarning,
-                           "The behaviour of affine_transform with a one-dimensional array .* has changed")
+                           "The behavior of affine_transform with a 1-D array .* has changed")
                 out1 = ndimage.affine_transform(data, [0.5], -1, order=order)
             out2 = ndimage.affine_transform(data, [[0.5]], -1, order=order)
             assert_array_almost_equal(out1, out2)
@@ -1998,7 +2037,7 @@ class TestNdimage:
                     data.dtype, data.dtype.newbyteorder()]:
             with suppress_warnings() as sup:
                 sup.filter(UserWarning,
-                           "The behaviour of affine_transform with a one-dimensional array .* has changed")
+                           "The behavior of affine_transform with a 1-D array .* has changed")
                 returned = ndimage.affine_transform(data, [1, 1], output=out)
             result = out if returned is None else returned
             assert_array_almost_equal(result, [[1, 1], [1, 1]])
@@ -2130,7 +2169,7 @@ class TestNdimage:
         for order in range(0, 6):
             with suppress_warnings() as sup:
                 sup.filter(UserWarning,
-                           "The behaviour of affine_transform with a one-dimensional array .* has changed")
+                           "The behavior of affine_transform with a 1-D array .* has changed")
                 out = ndimage.affine_transform(data, [0.5, 0.5], 0,
                                                (6, 8), order=order)
             assert_array_almost_equal(out[::2, ::2], data)
@@ -3587,7 +3626,7 @@ class TestNdimage:
                            [1, 0, 1]], dtype=bool)
         iterations = 2.0
         with assert_raises(TypeError):
-            out = ndimage.binary_erosion(data, iterations=iterations)
+            _ = ndimage.binary_erosion(data, iterations=iterations)
 
     def test_binary_erosion39(self):
         iterations = numpy.int32(3)

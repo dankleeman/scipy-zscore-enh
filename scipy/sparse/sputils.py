@@ -3,6 +3,7 @@
 
 from __future__ import division, print_function, absolute_import
 
+import sys
 import operator
 import warnings
 import numpy as np
@@ -10,10 +11,9 @@ import numpy as np
 __all__ = ['upcast', 'getdtype', 'isscalarlike', 'isintlike',
            'isshape', 'issequence', 'isdense', 'ismatrix', 'get_sum_dtype']
 
-supported_dtypes = ['bool', 'int8', 'uint8', 'short', 'ushort', 'intc',
-                    'uintc', 'longlong', 'ulonglong', 'single', 'double',
-                    'longdouble', 'csingle', 'cdouble', 'clongdouble']
-supported_dtypes = [np.typeDict[x] for x in supported_dtypes]
+supported_dtypes = [np.bool_, np.byte, np.ubyte, np.short, np.ushort, np.intc,
+                    np.uintc, np.int_, np.uint, np.longlong, np.ulonglong, np.single, np.double,
+                    np.longdouble, np.csingle, np.cdouble, np.clongdouble]
 
 _upcast_memo = {}
 
@@ -94,9 +94,9 @@ def to_native(A):
 
 
 def getdtype(dtype, a=None, default=None):
-    """Function used to simplify argument processing.  If 'dtype' is not
+    """Function used to simplify argument processing. If 'dtype' is not
     specified (is None), returns a.dtype; otherwise returns a np.dtype
-    object created from the specified dtype argument.  If 'dtype' and 'a'
+    object created from the specified dtype argument. If 'dtype' and 'a'
     are both None, construct a data type out of the 'default' parameter.
     Furthermore, 'dtype' must be in 'allowed' set.
     """
@@ -328,6 +328,14 @@ def check_reshape_kwargs(kwargs):
         raise TypeError('reshape() got unexpected keywords arguments: {}'
                         .format(', '.join(kwargs.keys())))
     return order, copy
+
+
+def is_pydata_spmatrix(m):
+    """
+    Check whether object is pydata/sparse matrix, avoiding importing the module.
+    """
+    base_cls = getattr(sys.modules.get('sparse'), 'SparseArray', None)
+    return base_cls is not None and isinstance(m, base_cls)
 
 
 ###############################################################################

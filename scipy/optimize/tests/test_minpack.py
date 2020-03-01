@@ -6,7 +6,8 @@ from __future__ import division, print_function, absolute_import
 import warnings
 
 from numpy.testing import (assert_, assert_almost_equal, assert_array_equal,
-                           assert_array_almost_equal, assert_allclose)
+                           assert_array_almost_equal, assert_allclose,
+                           assert_warns, suppress_warnings)
 from pytest import raises as assert_raises
 import numpy as np
 from numpy import array, float64
@@ -15,16 +16,16 @@ from multiprocessing.pool import ThreadPool
 from scipy import optimize
 from scipy.special import lambertw
 from scipy.optimize.minpack import leastsq, curve_fit, fixed_point
-from scipy._lib._numpy_compat import _assert_warns, suppress_warnings
 from scipy.optimize import OptimizeWarning
 
 
 class ReturnShape(object):
     """This class exists to create a callable that does not have a '__name__' attribute.
 
-    __init__ takes the argument 'shape', which should be a tuple of ints.  When an instance
-    it called with a single argument 'x', it returns numpy.ones(shape).
+    __init__ takes the argument 'shape', which should be a tuple of ints. When an instance
+    is called with a single argument 'x', it returns numpy.ones(shape).
     """
+
     def __init__(self, shape):
         self.shape = shape
 
@@ -47,7 +48,7 @@ def sequence_parallel(fs):
         pool.terminate()
 
 
-# Function and jacobian for tests of solvers for systems of nonlinear
+# Function and Jacobian for tests of solvers for systems of nonlinear
 # equations
 
 
@@ -58,23 +59,23 @@ def pressure_network(flow_rates, Qtot, k):
         f_i = P_i - P_0, for i = 1..n
         f_0 = sum(Q_i) - Qtot
 
-    Where Q_i is the flow rate in pipe i and P_i the pressure in that pipe.
+    where Q_i is the flow rate in pipe i and P_i the pressure in that pipe.
     Pressure is modeled as a P=kQ**2 where k is a valve coefficient and
     Q is the flow rate.
 
     Parameters
     ----------
     flow_rates : float
-        A 1D array of n flow rates [kg/s].
+        A 1-D array of n flow rates [kg/s].
     k : float
-        A 1D array of n valve coefficients [1/kg m].
+        A 1-D array of n valve coefficients [1/kg m].
     Qtot : float
         A scalar, the total input flow rate [kg/s].
 
     Returns
     -------
     F : float
-        A 1D array, F[i] == f_i.
+        A 1-D array, F[i] == f_i.
 
     """
     P = k * flow_rates**2
@@ -431,6 +432,7 @@ class TestCurveFit(object):
             """This class tests if curve_fit passes the correct number of
                arguments when the model function is a class instance method.
             """
+
             def func(self, x, a, b):
                 return b * x**a
 
@@ -509,7 +511,7 @@ class TestCurveFit(object):
         assert_array_equal(pcov1, pcov_expected)
 
     def test_array_like(self):
-        # Test sequence input.  Regression test for gh-3037.
+        # Test sequence input. Regression test for gh-3037.
         def f_linear(x, a, b):
             return a*x + b
 
@@ -521,8 +523,8 @@ class TestCurveFit(object):
         # Test that a warning is returned when pcov is indeterminate
         xdata = np.array([1, 2, 3, 4, 5, 6])
         ydata = np.array([1, 2, 3, 4, 5.5, 6])
-        _assert_warns(OptimizeWarning, curve_fit,
-                      lambda x, a, b: a*x, xdata, ydata)
+        assert_warns(OptimizeWarning, curve_fit,
+                     lambda x, a, b: a*x, xdata, ydata)
 
     def test_NaN_handling(self):
         # Test for correct handling of NaNs in input data: gh-3422
@@ -792,6 +794,19 @@ class TestCurveFit(object):
                                      ydata=0,
                                      method=method)
             assert_allclose(pcov0, pcov1)
+
+    def test_args_in_kwargs(self):
+        # Ensure that `args` cannot be passed as keyword argument to `curve_fit`
+
+        def func(x, a, b):
+            return a * x + b
+
+        with assert_raises(ValueError):
+            curve_fit(func,
+                      xdata=[1, 2, 3, 4],
+                      ydata=[5, 9, 13, 17],
+                      p0=[1],
+                      args=(1,))
 
 
 class TestFixedPoint(object):
