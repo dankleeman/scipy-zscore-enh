@@ -6,7 +6,6 @@ from __future__ import division, print_function, absolute_import
 
 from scipy import special
 from scipy.special import entr, logsumexp, betaln, gammaln as gamln
-from scipy._lib._numpy_compat import broadcast_to
 from scipy._lib._util import _lazywhere
 
 from numpy import floor, ceil, log, exp, sqrt, log1p, expm1, tanh, cosh, sinh
@@ -150,6 +149,87 @@ class bernoulli_gen(binom_gen):
 
 
 bernoulli = bernoulli_gen(b=1, name='bernoulli')
+
+
+class betabinom_gen(rv_discrete):
+    r"""A beta-binomial discrete random variable.
+
+    %(before_notes)s
+
+    Notes
+    -----
+    The beta-binomial distribution is a binomial distribution with a
+    probability of success `p` that follows a beta distribution.
+
+    The probability mass function for `betabinom` is:
+
+    .. math::
+
+       f(k) = \binom{n}{k} \frac{B(k + a, n - k + b)}{B(a, b)}
+
+    for ``k`` in ``{0, 1,..., n}``, :math:`n \geq 0`, :math:`a > 0`,
+    :math:`b > 0`, where :math:`B(a, b)` is the beta function.
+
+    `betabinom` takes :math:`n`, :math:`a`, and :math:`b` as shape parameters.
+
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Beta-binomial_distribution
+
+    %(after_notes)s
+
+    .. versionadded:: 1.4.0
+
+    See Also
+    --------
+    beta, binom
+
+    %(example)s
+
+    """
+
+    def _rvs(self, n, a, b):
+        p = self._random_state.beta(a, b, self._size)
+        return self._random_state.binomial(n, p, self._size)
+
+    def _get_support(self, n, a, b):
+        return 0, n
+
+    def _argcheck(self, n, a, b):
+        return (n >= 0) & (a > 0) & (b > 0)
+
+    def _logpmf(self, x, n, a, b):
+        k = floor(x)
+        combiln = -log(n + 1) - betaln(n - k + 1, k + 1)
+        return combiln + betaln(k + a, n - k + b) - betaln(a, b)
+
+    def _pmf(self, x, n, a, b):
+        return exp(self._logpmf(x, n, a, b))
+
+    def _stats(self, n, a, b, moments='mv'):
+        e_p = a / (a + b)
+        e_q = 1 - e_p
+        mu = n * e_p
+        var = n * (a + b + n) * e_p * e_q / (a + b + 1)
+        g1, g2 = None, None
+        if 's' in moments:
+            g1 = 1.0 / sqrt(var)
+            g1 *= (a + b + 2 * n) * (b - a)
+            g1 /= (a + b + 2) * (a + b)
+        if 'k' in moments:
+            g2 = a + b
+            g2 *= (a + b - 1 + 6 * n)
+            g2 += 3 * a * b * (n - 2)
+            g2 += 6 * n ** 2
+            g2 -= 3 * e_p * b * n * (6 - n)
+            g2 -= 18 * e_p * e_q * n ** 2
+            g2 *= (a + b) ** 2 * (1 + a + b)
+            g2 /= (n * a * b * (a + b + 2) * (a + b + 3) * (a + b + n))
+            g2 -= 3
+        return mu, var, g1, g2
+
+
+betabinom = betabinom_gen(name='betabinom')
 
 
 class nbinom_gen(rv_discrete):
@@ -741,17 +821,23 @@ class randint_gen(rv_discrete):
 
     def _rvs(self, low, high):
         """An array of *size* random integers >= ``low`` and < ``high``."""
+        if hasattr(self._random_state, 'integers'):
+            # isinstance(self._random_state, np.random.Generator)
+            int_fun = self._random_state.integers
+        else:
+            int_fun = self._random_state.randint
+
         if np.asarray(low).size == 1 and np.asarray(high).size == 1:
             # no need to vectorize in that case
-            return self._random_state.randint(low, high, size=self._size)
+            return int_fun(low, high, size=self._size)
         if self._size is not None:
             # NumPy's RandomState.randint() doesn't broadcast its arguments.
             # Use `broadcast_to()` to extend the shapes of low and high
             # up to self._size.  Then we can use the numpy.vectorize'd
             # randint without needing to pass it a `size` argument.
-            low = broadcast_to(low, self._size)
-            high = broadcast_to(high, self._size)
-        randint = np.vectorize(self._random_state.randint, otypes=[np.int_])
+            low = np.broadcast_to(low, self._size)
+            high = np.broadcast_to(high, self._size)
+        randint = np.vectorize(int_fun, otypes=[np.int_])
         return randint(low, high)
 
     def _entropy(self, low, high):
@@ -855,6 +941,27 @@ class dlaplace_gen(rv_discrete):
 
     def _entropy(self, a):
         return a / sinh(a) - log(tanh(a/2.0))
+
+    def _rvs(self, a):
+        # The discrete Laplace is equivalent to the two-sided geometric
+        # distribution with PMF:
+        #   f(k) = (1 - alpha)/(1 + alpha) * alpha^abs(k)
+        #   Reference:
+        #     https://www.sciencedirect.com/science/
+        #     article/abs/pii/S0378375804003519
+        # Furthermore, the two-sided geometric distribution is
+        # equivalent to the difference between two iid geometric 
+        # distributions.
+        #   Reference (page 179):
+        #     https://pdfs.semanticscholar.org/61b3/
+        #     b99f466815808fd0d03f5d2791eea8b541a1.pdf
+        # Thus, we can leverage the following:
+        #   1) alpha = e^-a
+        #   2) probability_of_success = 1 - alpha (Bernoulli trial)
+        probOfSuccess = -np.expm1(-np.asarray(a))
+        x = self._random_state.geometric(probOfSuccess, size=self._size)
+        y = self._random_state.geometric(probOfSuccess, size=self._size)
+        return x - y
 
 
 dlaplace = dlaplace_gen(a=-np.inf,

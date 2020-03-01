@@ -7,12 +7,12 @@ Linear algebra (:mod:`scipy.linalg`)
 
 Linear algebra functions.
 
-.. eventually we should replace the numpy.linalg HTML link with just `numpy.linalg`
+.. eventually, we should replace the numpy.linalg HTML link with just `numpy.linalg`
 
 .. seealso::
 
    `numpy.linalg <https://www.numpy.org/devdocs/reference/routines.linalg.html>`__
-   for more linear algebra functions.  Note that
+   for more linear algebra functions. Note that
    although `scipy.linalg` imports most of them, identically named
    functions from `scipy.linalg` may offer more or slightly differing
    functionality.
@@ -38,6 +38,7 @@ Basics
    pinv2 - Pseudo-inverse using svd
    pinvh - Pseudo-inverse of hermitian matrix
    kron - Kronecker product of two arrays
+   khatri_rao - Khatri-Rao product of two arrays
    tril - Construct a lower-triangular matrix from a given matrix
    triu - Construct an upper-triangular matrix from a given matrix
    orthogonal_procrustes - Solve an orthogonal Procrustes problem

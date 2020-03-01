@@ -13,8 +13,7 @@ from numpy import array, eye, exp, random
 from numpy.linalg import matrix_power
 from numpy.testing import (
         assert_allclose, assert_, assert_array_almost_equal, assert_equal,
-        assert_array_almost_equal_nulp)
-from scipy._lib._numpy_compat import suppress_warnings
+        assert_array_almost_equal_nulp, suppress_warnings)
 
 from scipy.sparse import csc_matrix, SparseEfficiencyWarning
 from scipy.sparse.construct import eye as speye
@@ -521,9 +520,19 @@ class TestExpM(object):
                 got = B
                 expected = binom(np.arange(n + 1)[:,None],
                                  np.arange(n + 1)[None,:]) * sc[None,:] / sc[:,None]
-                err = abs(expected - got).max()
                 atol = 1e-13 * abs(expected).max()
                 assert_allclose(got, expected, atol=atol)
+
+    def test_matrix_input(self):
+        # Large np.matrix inputs should work, gh-5546
+        A = np.zeros((200, 200))
+        A[-1,0] = 1
+        B0 = expm(A)
+        with suppress_warnings() as sup:
+            sup.filter(DeprecationWarning, "the matrix subclass.*")
+            sup.filter(PendingDeprecationWarning, "the matrix subclass.*")
+            B = expm(np.matrix(A))
+        assert_allclose(B, B0)
 
 
 class TestOperators(object):

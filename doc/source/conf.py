@@ -132,6 +132,9 @@ for key in (
         ):
     warnings.filterwarnings(  # deal with other modules having bad imports
         'ignore', message=".*" + key, category=DeprecationWarning)
+warnings.filterwarnings(  # matplotlib<->pyparsing issue
+    'ignore', message="Exception creating Regex for oneOf.*",
+    category=SyntaxWarning)
 # warnings in examples (mostly) that we allow
 # TODO: eventually these should be eliminated!
 for key in (
@@ -322,7 +325,7 @@ latex_elements = {
 # -----------------------------------------------------------------------------
 intersphinx_mapping = {
     'python': ('https://docs.python.org/dev', None),
-    'numpy': ('https://docs.scipy.org/doc/numpy', None),
+    'numpy': ('https://numpy.org/devdocs', None),
     'matplotlib': ('https://matplotlib.org', None),
     'asv': ('https://asv.readthedocs.io/en/stable/', None),
 }
