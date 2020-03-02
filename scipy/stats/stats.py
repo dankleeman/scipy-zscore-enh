@@ -2367,6 +2367,7 @@ def zscore(a, axis=0, ddof=0, nan_policy='propagate'):
         Defines how to handle when input contains nan. 'propagate' returns nan,
         'raise' throws an error, 'omit' performs the calculations ignoring nan
         values. Default is 'propagate'.
+
     Returns
     -------
     zscore : array_like
